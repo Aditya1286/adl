@@ -202,7 +202,7 @@ function AdminDashboard() {
           {/* Profile Edit Card */}
           {showProfileForm && (
             <div className="bg-white/90 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/30 p-4 sm:p-8">
-              <div className="flex items-center justify-between mb-8 gap-4">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8 gap-4">
                 <h2 className="text-xl sm:text-2xl font-bold text-gray-900 flex items-center gap-3">
                   <User className="w-6 h-6 sm:w-7 sm:h-7 text-indigo-600" />
                   Update Your Profile
