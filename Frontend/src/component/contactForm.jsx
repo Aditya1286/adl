@@ -21,7 +21,7 @@ export default function ContactForm() {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    fetch("http://localhost:8080/contact/send-email", {
+    fetch("https://adl-api-ten.vercel.app/contact/send-email", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(formData),
