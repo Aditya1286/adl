@@ -11,7 +11,7 @@ function CreateQuery() {
   const [files, setFiles] = useState([]);
 
   React.useEffect(() => {
-    fetch("http://localhost:8080/admin/list")
+    fetch("https://adl-api-ten.vercel.app/admin/list")
       .then(res => res.json())
       .then(data => {
         if (data.success) setAdmins(data.admins || []);
@@ -37,7 +37,7 @@ function CreateQuery() {
       if (form.adminId) fd.append("adminId", form.adminId);
       files.forEach((file) => fd.append("attachments", file));
 
-      const res = await fetch("http://localhost:8080/auth/query", {
+      const res = await fetch("https://adl-api-ten.vercel.app/auth/query", {
         method: "POST",
         headers: {
           Authorization: token,
