@@ -44,7 +44,7 @@ function AdminDashboard() {
 
   useEffect(() => {
     if (!adminToken) return;
-    fetch("http://localhost:8080/admin/list")
+    fetch("https://adl-api-ten.vercel.app/admin/list")
       .then(res => res.json())
       .then(data => {
         if (data.success) {
@@ -59,7 +59,7 @@ function AdminDashboard() {
 
   const loadProblems = async () => {
     try {
-      const res = await fetch("http://localhost:8080/admin/problems", {
+      const res = await fetch("https://adl-api-ten.vercel.app/admin/problems", {
         headers: { Authorization: adminToken },
       });
       const data = await res.json();
@@ -75,7 +75,7 @@ function AdminDashboard() {
 
   const handleProfileSave = async () => {
     try {
-      const res = await fetch("http://localhost:8080/admin/profile", {
+      const res = await fetch("https://adl-api-ten.vercel.app/admin/profile", {
         method: "PUT",
         headers: { "Content-Type": "application/json", Authorization: adminToken },
         body: JSON.stringify(profile),
@@ -94,7 +94,7 @@ function AdminDashboard() {
 
   const updateProblem = async (problemId, payload) => {
     try {
-      const res = await fetch(`http://localhost:8080/admin/problems/${problemId}`, {
+      const res = await fetch(`https://adl-api-ten.vercel.app/admin/problems/${problemId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json", Authorization: adminToken },
         body: JSON.stringify(payload),
@@ -120,7 +120,7 @@ function AdminDashboard() {
   const handleArticleSubmit = async () => {
     if (!article.title || !article.summary) return handleError("Title and summary required");
     try {
-      const res = await fetch("http://localhost:8080/library", {
+      const res = await fetch("https://adl-api-ten.vercel.app/library", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: adminToken },
         body: JSON.stringify(article),
