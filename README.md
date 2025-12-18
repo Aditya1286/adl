@@ -211,14 +211,14 @@ TWILIO_AUTH_TOKEN=your_twilio_auth_token
 TWILIO_PHONE_NUMBER=your_twilio_phone_number
 
 # Frontend URL
-FRONTEND_URL=http://localhost:3000
+FRONTEND_URL=http://localhost:5173
 ```
 
 Create a `.env` file in the `Frontend` directory:
 
 ```env
-REACT_APP_API_URL=http://localhost:5000/api
-REACT_APP_SOCKET_URL=http://localhost:5000
+REACT_APP_API_URL=http://localhost:8080/api
+REACT_APP_SOCKET_URL=http://localhost:8080
 ```
 
 5. **Start MongoDB**
