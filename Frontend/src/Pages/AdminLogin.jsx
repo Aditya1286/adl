@@ -50,7 +50,7 @@ function AdminLogin() {
       return handleError("Please fill in all fields");
 
     try {
-      const res = await fetch("http://localhost:8080/admin/login", {
+      const res = await fetch("https://adl-api-ten.vercel.app/admin/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(adminInfo),
