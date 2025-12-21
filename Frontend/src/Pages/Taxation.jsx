@@ -9,7 +9,7 @@ export default function Taxation() {
             <Navbar />
             
             {/* Hero Section */}
-            <div className="bg-gradient-to-br from-indigo-700 via-indigo-800 to-indigo-900 text-white pt-30 pb-10 px-6 md:px-10">
+            <div className="bg-gradient-to-br from-[#0C2B4E] to-[#1a3d66] text-white pt-30 pb-10 px-6 md:px-10">
                 <div className="max-w-6xl mx-auto text-center">
                     <TextReveal delay={0.2} text="Taxation & Return Filing" className="font-bold text-4xl md:text-5xl lg:text-5xl mb-4" />
                     <br />
@@ -24,7 +24,7 @@ export default function Taxation() {
                     <BlockReveal>
                         <div className="bg-white rounded-2xl shadow-lg p-8 md:p-10 mb-8 hover:shadow-xl transition-shadow duration-300">
                             <div className="flex items-start gap-4 mb-6">
-                                <div className="bg-indigo-600 text-white rounded-full w-12 h-12 flex items-center justify-center flex-shrink-0 text-xl font-bold">
+                                <div className="bg-[#123359] text-white rounded-full w-12 h-12 flex items-center justify-center flex-shrink-0 text-xl font-bold">
                                     1
                                 </div>
                                 <div className="flex-1">
@@ -49,7 +49,7 @@ export default function Taxation() {
                     <BlockReveal>
                         <div className="bg-white rounded-2xl shadow-lg p-8 md:p-10 mb-8 hover:shadow-xl transition-shadow duration-300">
                             <div className="flex items-start gap-4 mb-6">
-                                <div className="bg-indigo-600 text-white rounded-full w-12 h-12 flex items-center justify-center flex-shrink-0 text-xl font-bold">
+                                <div className="bg-[#123359] text-white rounded-full w-12 h-12 flex items-center justify-center flex-shrink-0 text-xl font-bold">
                                     2
                                 </div>
                                 <div className="flex-1">
@@ -73,7 +73,7 @@ export default function Taxation() {
                     <BlockReveal>
                         <div className="bg-white rounded-2xl shadow-lg p-6 md:p-8 lg:p-10 mb-8 hover:shadow-xl transition-shadow duration-300">
                             <div className="flex flex-col sm:flex-row items-start gap-4 mb-6">
-                                <div className="bg-indigo-600 text-white rounded-full w-12 h-12 flex items-center justify-center flex-shrink-0 text-xl font-bold">
+                                <div className="bg-[#123359] text-white rounded-full w-12 h-12 flex items-center justify-center flex-shrink-0 text-xl font-bold">
                                     3
                                 </div>
                                 <div className="flex-1">
