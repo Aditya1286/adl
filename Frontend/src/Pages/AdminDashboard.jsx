@@ -18,7 +18,6 @@ import {
   Download,
   MessageSquare,
   BookOpen,
-  RefreshCw,
 } from "lucide-react";
 
 // Helper function to decode JWT token (no dependencies)
@@ -55,7 +54,6 @@ function AdminDashboard() {
     link: "",
   });
   const [loading, setLoading] = useState(true);
-  const [updatingId, setUpdatingId] = useState(null);
 
   // Clock update every second
   useEffect(() => {
@@ -156,7 +154,6 @@ function AdminDashboard() {
 
   const updateProblem = async (problemId, payload) => {
     try {
-      setUpdatingId(problemId);
       const res = await fetch(`https://adl-api-ten.vercel.app/admin/problems/${problemId}`, {
         method: "PUT",
         headers: {
@@ -174,8 +171,6 @@ function AdminDashboard() {
       }
     } catch (err) {
       handleError("Server unavailable");
-    } finally {
-      setUpdatingId(null);
     }
   };
 
@@ -217,13 +212,8 @@ function AdminDashboard() {
     date.toLocaleTimeString("en-US", {
       hour: "2-digit",
       minute: "2-digit",
-      second: "2-digit",
+      second: "2-second",
     });
-
-  const handleRefresh = () => {
-    loadProblems();
-    handleSuccess("Dashboard refreshed");
-  };
 
   // Loading state
   if (loading) {
@@ -279,14 +269,6 @@ function AdminDashboard() {
 
               <div className="flex items-center gap-4">
                 <button
-                  onClick={handleRefresh}
-                  className="hidden md:flex items-center gap-3 px-6 py-3.5 bg-gray-100 hover:bg-gray-200 rounded-2xl font-semibold transition-all duration-300 shadow-md flex items-center"
-                  title="Refresh Dashboard"
-                >
-                  <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
-                  Refresh
-                </button>
-                <button
                   onClick={() => setShowProfileForm(!showProfileForm)}
                   className="hidden md:flex items-center gap-3 px-6 py-3.5 bg-gray-100 hover:bg-gray-200 rounded-2xl font-semibold transition-all duration-300 shadow-md"
                 >
@@ -322,7 +304,7 @@ function AdminDashboard() {
                 <div className="lg:col-span-2 space-y-6">
                   <div className="flex items-center gap-6">
                     <img
-                      src={profile.photo || `https://ui-avatars.com/api/?name=${profile.name || "CA"}&background=6366f1&color=fff&bold=true`}
+                      src={profile.photo || `https://ui-avatars.com/api/?name=${profile.name || "CA"}`}
                       alt="admin"
                       className="w-28 h-28 rounded-3xl ring-8 ring-indigo-100 shadow-xl object-cover"
                     />
@@ -540,15 +522,9 @@ function AdminDashboard() {
                                   meetupDate: p.meetupDate || null,
                                 })
                               }
-                              disabled={updatingId === p.problemId}
-                              className="flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold rounded-2xl hover:shadow-2xl transform hover:scale-105 transition-all duration-300 shadow-xl disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                              className="flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold rounded-2xl hover:shadow-2xl transform hover:scale-105 transition-all duration-300 shadow-xl"
                             >
-                              {updatingId === p.problemId ? (
-                                <RefreshCw className="w-6 h-6 animate-spin" />
-                              ) : (
-                                <Save className="w-6 h-6" />
-                              )}
-                              {updatingId === p.problemId ? "Updating..." : "Update Query"}
+                              <Save className="w-6 h-6" /> Update Query
                             </button>
                           </div>
                         </div>
