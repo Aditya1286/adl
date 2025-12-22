@@ -150,7 +150,7 @@ function AdminDashboard() {
                <div className="flex items-center gap-6">
                  <div className="flex items-center gap-4">
                    <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-2xl bg-white">
-                     <img src="/src/assets/logo.png" alt="Elite Advisers" className="w-12 h-12 object-contain" />
+                     <img src="https://husky-moccasin-zaclmwn5bi-pzz61aexj1.edgeone.dev/logo.png" alt="Elite Advisers" className="w-12 h-12 object-contain" />
                    </div>
                    <div>
                      <p className="text-sm font-medium text-gray-500">Compliance Advisor Panel</p>
