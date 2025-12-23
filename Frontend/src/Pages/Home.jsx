@@ -33,7 +33,7 @@ import {
   ResponsiveContainer
 } from "recharts";
 
-// Base API URL for deployed backend
+// Base API URL - deployed backend
 const API_BASE_URL = "https://adl-api-ten.vercel.app";
 
 const StatCard = ({ icon: Icon, label, value, color, trend }) => (
@@ -72,6 +72,7 @@ function Home() {
   const [notifications, setNotifications] = useState([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [authToken, setAuthToken] = useState("");
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -79,9 +80,10 @@ function Home() {
       navigate("/login");
       return;
     }
+    setAuthToken(token);
     loadDashboard(token);
 
-    // Fetch list of admins (for displaying names)
+    // Fetch admin list for displaying names/photos
     fetch(`${API_BASE_URL}/admin/list`)
       .then(res => res.json())
       .then(data => {
@@ -126,6 +128,51 @@ function Home() {
   const handleAddQuery = () => navigate("/query");
   const goToProfile = () => navigate("/profile");
   const goToLibrary = () => navigate("/library");
+
+  const rateClosedCase = async (problemId, ratingValue) => {
+    if (!ratingValue) return;
+    const token = authToken || localStorage.getItem("token");
+    if (!token) {
+      handleError("Please log in again to rate");
+      return;
+    }
+    try {
+      const res = await fetch(`${API_BASE_URL}/auth/query/${problemId}/rate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: token },
+        body: JSON.stringify({ rating: Number(ratingValue) })
+      });
+      const result = await res.json();
+      if (result.success) {
+        handleSuccess("Thanks for your feedback!");
+        loadDashboard(token);
+      } else {
+        handleError(result.message || "Unable to submit rating");
+      }
+    } catch {
+      handleError("Server unavailable");
+    }
+  };
+
+  const reopenCase = async (problemId) => {
+    const token = authToken || localStorage.getItem("token");
+    if (!token) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/auth/query/${problemId}/reopen`, {
+        method: "POST",
+        headers: { Authorization: token }
+      });
+      const result = await res.json();
+      if (result.success) {
+        handleSuccess("Case reopened successfully");
+        loadDashboard(token);
+      } else {
+        handleError(result.message || "Failed to reopen case");
+      }
+    } catch {
+      handleError("Server unavailable");
+    }
+  };
 
   if (loading) {
     return (
@@ -180,13 +227,10 @@ function Home() {
   return (
     <>
       <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50">
-
         {/* Premium Navbar */}
         <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-2xl border-b border-white/20 shadow-xl">
           <div className="max-w-7xl mx-auto px-6">
             <div className="flex items-center justify-between h-20">
-
-              {/* Logo + Brand */}
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 rounded-2xl flex items-center justify-center shadow-2xl bg-white">
                   <img src="/src/assets/logo.png" alt="Elite Advisers" className="w-10 h-10 object-contain" />
@@ -196,7 +240,6 @@ function Home() {
                 </span>
               </div>
 
-              {/* Desktop Navigation */}
               <nav className="hidden lg:flex items-center gap-3">
                 <button
                   onClick={() => setShowNotifications(!showNotifications)}
@@ -227,7 +270,6 @@ function Home() {
                 </button>
               </nav>
 
-              {/* Mobile Menu Toggle */}
               <button
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
                 className="lg:hidden p-3 rounded-xl hover:bg-gray-100 transition"
@@ -237,7 +279,6 @@ function Home() {
             </div>
           </div>
 
-          {/* Mobile Menu */}
           {mobileMenuOpen && (
             <div className="lg:hidden border-t border-gray-200 bg-white/95 backdrop-blur-xl">
               <div className="px-6 py-6 space-y-6">
@@ -295,7 +336,6 @@ function Home() {
                     >
                       <MessageSquare className="w-6 h-6 text-indigo-600 mt-1 flex-shrink-0" />
                       <p className="text-sm text-gray-700 leading-relaxed flex-1 pr-8">{n.text}</p>
-
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -326,7 +366,7 @@ function Home() {
             <StatCard icon={BarChart3} label="Total Queries" value={totals?.totalProblems || 0} color="bg-gradient-to-br from-purple-500 to-indigo-600" trend={18} />
           </div>
 
-          {/* Chart + CAs */}
+          {/* Chart + Assigned Advisors */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
             <div className="lg:col-span-2 bg-white/90 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/30 p-8">
               <div className="flex items-center justify-between mb-8">
@@ -435,54 +475,24 @@ function Home() {
                       {item.attachments?.length > 0 && (
                         <div className="flex flex-wrap gap-4">
                           {item.attachments.map((f, fi) => (
-                            <a key={fi} href={`${API_BASE_URL}${f.url}`} target="_blank" rel="noreferrer"
-                              className="inline-flex items-center gap-3 px-5 py-3 bg-blue-100 text-blue-700 rounded-2xl font-semibold hover:bg-blue-200 transition">
+                            <a
+                              key={fi}
+                              href={`${API_BASE_URL}${f.url}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-3 px-5 py-3 bg-blue-100 text-blue-700 rounded-2xl font-semibold hover:bg-blue-200 transition"
+                            >
                               <Download className="w-5 h-5" /> {f.name}
                             </a>
                           ))}
                         </div>
                       )}
 
+                      {/* Reopen button only for closed cases in active section (edge case) */}
                       {item.status === "closed" && (
                         <div className="flex items-center gap-6 pt-4">
-                          <div className="flex items-center gap-4">
-                            <span className="font-medium text-gray-700">Rate your experience:</span>
-                            <select
-                              defaultValue={item.rating || ""}
-                              onChange={async (e) => {
-                                const token = localStorage.getItem("token");
-                                const res = await fetch(`${API_BASE_URL}/auth/query/${item._id}/rate`, {
-                                  method: "POST",
-                                  headers: { "Content-Type": "application/json", Authorization: token },
-                                  body: JSON.stringify({ rating: Number(e.target.value) })
-                                });
-                                const result = await res.json();
-                                if (result.success) {
-                                  handleSuccess("Thank you for your feedback!");
-                                  loadDashboard(token);
-                                }
-                              }}
-                              className="px-6 py-3 border-2 border-gray-300 rounded-2xl focus:ring-4 focus:ring-indigo-300 focus:border-indigo-500 font-semibold"
-                            >
-                              <option value="">Select Rating</option>
-                              {[1,2,3,4,5].map(n => (
-                                <option key={n} value={n}>{n} Stars {n === 5 && "Excellent"}</option>
-                              ))}
-                            </select>
-                          </div>
                           <button
-                            onClick={async () => {
-                              const token = localStorage.getItem("token");
-                              const res = await fetch(`${API_BASE_URL}/auth/query/${item._id}/reopen`, {
-                                method: "POST",
-                                headers: { Authorization: token }
-                              });
-                              const result = await res.json();
-                              if (result.success) {
-                                handleSuccess("Case reopened");
-                                loadDashboard(token);
-                              }
-                            }}
+                            onClick={() => reopenCase(item._id)}
                             className="flex items-center gap-3 px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-600 text-white font-bold rounded-2xl hover:shadow-xl transition"
                           >
                             <RefreshCw className="w-5 h-5" /> Reopen Case
@@ -557,8 +567,13 @@ function Home() {
                       {item.attachments?.length > 0 && (
                         <div className="flex flex-wrap gap-4">
                           {item.attachments.map((f, fi) => (
-                            <a key={fi} href={`${API_BASE_URL}${f.url}`} target="_blank" rel="noreferrer"
-                              className="inline-flex items-center gap-3 px-5 py-3 bg-blue-100 text-blue-700 rounded-2xl font-semibold hover:bg-blue-200 transition">
+                            <a
+                              key={fi}
+                              href={`${API_BASE_URL}${f.url}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-3 px-5 py-3 bg-blue-100 text-blue-700 rounded-2xl font-semibold hover:bg-blue-200 transition"
+                            >
                               <Download className="w-5 h-5" /> {f.name}
                             </a>
                           ))}
@@ -567,15 +582,23 @@ function Home() {
 
                       <div className="flex items-center gap-6 pt-2">
                         <span className="px-4 py-2 bg-emerald-100 text-emerald-700 rounded-xl font-semibold">Closed</span>
-                        {item.rating ? (
+                        <div className="flex items-center gap-3">
                           <span className="flex items-center gap-2 text-yellow-500 font-bold">
                             {[...Array(5)].map((_, n) => (
-                              <Star key={n} className={`w-6 h-6 ${n < item.rating ? "text-yellow-500 fill-current" : "text-gray-300"}`} />
+                              <Star key={n} className={`w-6 h-6 ${n < (item.rating || 0) ? "text-yellow-500 fill-current" : "text-gray-300"}`} />
                             ))}
                           </span>
-                        ) : (
-                          <span className="text-gray-500">No rating yet</span>
-                        )}
+                          <select
+                            value={item.rating || ""}
+                            onChange={(e) => rateClosedCase(item._id, e.target.value)}
+                            className="px-3 py-2 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-indigo-200 focus:border-indigo-500 text-sm font-semibold"
+                          >
+                            <option value="">Rate</option>
+                            {[1,2,3,4,5].map((n) => (
+                              <option key={n} value={n}>{n} Star{n > 1 ? "s" : ""}</option>
+                            ))}
+                          </select>
+                        </div>
                       </div>
                     </div>
 
