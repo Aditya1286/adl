@@ -3,14 +3,12 @@ import { useNavigate } from "react-router-dom";
 import { handleError, handleSuccess } from "../utils";
 import { ToastContainer } from "react-toastify";
 import {
-  Bell,
   LogOut,
   User,
   Clock,
   FileText,
   CheckCircle,
   AlertCircle,
-  Users,
   Plus,
   Edit3,
   Save,
@@ -20,53 +18,117 @@ import {
   Download,
   MessageSquare,
   BookOpen,
-  TrendingUp
 } from "lucide-react";
+
+// Helper function to decode JWT token (no dependencies)
+const parseJwt = (token) => {
+  try {
+    const base64Url = token.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    );
+    return JSON.parse(jsonPayload);
+  } catch (e) {
+    return null;
+  }
+};
+
+// Base API URL (change only here if needed in the future)
+const API_BASE_URL = "https://adl-api-ten.vercel.app";
 
 function AdminDashboard() {
   const navigate = useNavigate();
   const adminToken = localStorage.getItem("adminToken");
-  const [profile, setProfile] = useState({ name: "", email: "", photo: "", bio: "" });
+
+  const [profile, setProfile] = useState({ name: "", email: "", photo: "", bio: "", _id: "" });
   const [problems, setProblems] = useState([]);
   const [admins, setAdmins] = useState([]);
   const [clock, setClock] = useState(new Date());
   const [showProfileForm, setShowProfileForm] = useState(false);
-  const [article, setArticle] = useState({ title: "", tags: "", summary: "", citation: "", link: "" });
+  const [article, setArticle] = useState({
+    title: "",
+    tags: "",
+    summary: "",
+    citation: "",
+    link: "",
+  });
+  const [loading, setLoading] = useState(true);
 
+  // Clock update every second
+  useEffect(() => {
+    const timer = setInterval(() => setClock(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Main authentication & data loading
   useEffect(() => {
     if (!adminToken) {
       navigate("/admin-login");
       return;
     }
-    const timer = setInterval(() => setClock(new Date()), 1000);
-    return () => clearInterval(timer);
-  }, [adminToken, navigate]);
 
-  useEffect(() => {
-    if (!adminToken) return;
-    fetch("https://adl-api-ten.vercel.app/admin/list")
-      .then(res => res.json())
-      .then(data => {
-        if (data.success) {
-          setAdmins(data.admins || []);
-          const me = data.admins?.find(a => a.email === profile.email) || data.admins?.[0];
-          if (me && !profile.name) setProfile(prev => ({ ...prev, ...me }));
+    const decoded = parseJwt(adminToken);
+    if (!decoded || !decoded.email) {
+      handleError("Invalid or expired session. Please login again.");
+      handleLogout();
+      return;
+    }
+
+    const currentAdminEmail = decoded.email;
+
+    const fetchAdminData = async () => {
+      try {
+        setLoading(true);
+        const res = await fetch(`${API_BASE_URL}/admin/list`);
+        const data = await res.json();
+
+        if (data.success && Array.isArray(data.admins)) {
+          setAdmins(data.admins);
+
+          const currentAdmin = data.admins.find((admin) => admin.email === currentAdminEmail);
+
+          if (currentAdmin) {
+            setProfile(currentAdmin);
+          } else {
+            handleError("Your account was not found. Please contact support.");
+            handleLogout();
+            return;
+          }
+        } else {
+          handleError("Failed to load admin data");
         }
-      })
-      .catch(() => {});
+      } catch (err) {
+        handleError("Unable to connect to server");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchAdminData();
     loadProblems();
-  }, []);
+  }, [adminToken, navigate]);
 
   const loadProblems = async () => {
     try {
-      const res = await fetch("https://adl-api-ten.vercel.app/admin/problems", {
+      const res = await fetch(`${API_BASE_URL}/admin/problems`, {
         headers: { Authorization: adminToken },
       });
       const data = await res.json();
       if (data.success) {
-        setProblems(data.problems || []);
+        const enriched = (data.problems || []).map((p) => ({
+          ...p,
+          statusDraft: p.status || "pending",
+          adminMessageDraft: p.adminMessage || "",
+          meetupDateDraft: p.meetupDate ? new Date(p.meetupDate).toISOString().split("T")[0] : "",
+          assignToDraft: p.assignedAdmin?._id || "",
+        }));
+        setProblems(enriched);
       } else {
-        handleError(data.message || "Failed to load problems");
+        handleError(data.message || "Failed to load queries");
       }
     } catch (err) {
       handleError("Server unavailable");
@@ -75,9 +137,12 @@ function AdminDashboard() {
 
   const handleProfileSave = async () => {
     try {
-      const res = await fetch("https://adl-api-ten.vercel.app/admin/profile", {
+      const res = await fetch(`${API_BASE_URL}/admin/profile`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json", Authorization: adminToken },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: adminToken,
+        },
         body: JSON.stringify(profile),
       });
       const data = await res.json();
@@ -85,7 +150,7 @@ function AdminDashboard() {
         handleSuccess("Profile updated successfully");
         setShowProfileForm(false);
       } else {
-        handleError(data.message || "Update failed");
+        handleError(data.message || "Failed to update profile");
       }
     } catch (err) {
       handleError("Server unavailable");
@@ -94,15 +159,18 @@ function AdminDashboard() {
 
   const updateProblem = async (problemId, payload) => {
     try {
-      const res = await fetch(`https://adl-api-ten.vercel.app/admin/problems/${problemId}`, {
+      const res = await fetch(`${API_BASE_URL}/admin/problems/${problemId}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json", Authorization: adminToken },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: adminToken,
+        },
         body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (data.success) {
-        handleSuccess("Query updated");
-        loadProblems();
+        handleSuccess("Query updated successfully");
+        await loadProblems(); // Refresh from server
       } else {
         handleError(data.message || "Update failed");
       }
@@ -113,16 +181,24 @@ function AdminDashboard() {
 
   const handleLogout = () => {
     localStorage.removeItem("adminToken");
-    handleSuccess("Logged out");
+    setProfile({ name: "", email: "", photo: "", bio: "", _id: "" });
+    setAdmins([]);
+    setProblems([]);
+    handleSuccess("Logged out successfully");
     navigate("/admin-login");
   };
 
   const handleArticleSubmit = async () => {
-    if (!article.title || !article.summary) return handleError("Title and summary required");
+    if (!article.title || !article.summary) {
+      return handleError("Title and summary are required");
+    }
     try {
-      const res = await fetch("https://adl-api-ten.vercel.app/library", {
+      const res = await fetch(`${API_BASE_URL}/library`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: adminToken },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: adminToken,
+        },
         body: JSON.stringify(article),
       });
       const data = await res.json();
@@ -130,39 +206,58 @@ function AdminDashboard() {
         handleSuccess("Article published to library");
         setArticle({ title: "", tags: "", summary: "", citation: "", link: "" });
       } else {
-        handleError(data.message || "Failed to add article");
+        handleError(data.message || "Failed to publish article");
       }
     } catch (err) {
       handleError("Server unavailable");
     }
   };
 
-  const formatTime = (date) => date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  const formatTime = (date) =>
+    date.toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-6"></div>
+          <p className="text-xl font-semibold text-indigo-700">Loading your dashboard...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
       <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50">
-
         {/* Header */}
         <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-2xl border-b border-white/20 shadow-xl">
           <div className="max-w-7xl mx-auto px-6 py-5">
-             <div className="flex items-center justify-between">
-               <div className="flex items-center gap-6">
-                 <div className="flex items-center gap-4">
-                   <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-2xl bg-white">
-                     <img src="https://husky-moccasin-zaclmwn5bi-pzz61aexj1.edgeone.dev/logo.png" alt="Elite Advisers" className="w-12 h-12 object-contain" />
-                   </div>
-                   <div>
-                     <p className="text-sm font-medium text-gray-500">Compliance Advisor Panel</p>
-                     <h1 className="brand-font text-3xl font-black bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent tracking-widest">
-                       Elite Advisers Admin
-                     </h1>
-                   </div>
-                 </div>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-6">
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-2xl bg-white">
+                    <img src="/src/assets/logo.png" alt="Elite Advisers" className="w-12 h-12 object-contain" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-500">Compliance Advisor Panel</p>
+                    <h1 className="brand-font text-3xl font-black bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent tracking-widest">
+                      Elite Advisers Admin
+                    </h1>
+                  </div>
+                </div>
 
                 <div className="hidden md:flex items-center gap-4 pl-8 border-l border-gray-200">
                   <img
-                    src={profile.photo || `https://ui-avatars.com/api/?name=${profile.name || "CA"}&background=6366f1&color=fff&bold=true`}
+                    src={
+                      profile.photo ||
+                      `https://ui-avatars.com/api/?name=${encodeURIComponent(profile.name || "CA")}&background=6366f1&color=fff&bold=true`
+                    }
                     alt="admin"
                     className="w-14 h-14 rounded-full ring-4 ring-indigo-100 shadow-xl object-cover"
                   />
@@ -198,7 +293,6 @@ function AdminDashboard() {
 
         {/* Main Content */}
         <main className="max-w-7xl mx-auto px-6 py-10 space-y-10">
-
           {/* Profile Edit Card */}
           {showProfileForm && (
             <div className="bg-white/90 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/30 p-8">
@@ -269,15 +363,21 @@ function AdminDashboard() {
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Assigned to You</span>
-                      <span className="font-bold text-emerald-600">{problems.filter(p => p.assignedAdmin?._id === profile._id).length}</span>
+                      <span className="font-bold text-emerald-600">
+                        {problems.filter((p) => p.assignedAdmin?._id === profile._id).length}
+                      </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Unassigned</span>
-                      <span className="font-bold text-amber-600">{problems.filter(p => !p.assignedAdmin).length}</span>
+                      <span className="font-bold text-amber-600">
+                        {problems.filter((p) => !p.assignedAdmin).length}
+                      </span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-600">Closed Today</span>
-                      <span className="font-bold text-purple-600">{problems.filter(p => p.status === "closed").length}</span>
+                      <span className="text-gray-600">Closed Cases</span>
+                      <span className="font-bold text-purple-600">
+                        {problems.filter((p) => p.status === "closed").length}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -285,7 +385,7 @@ function AdminDashboard() {
             </div>
           )}
 
-          {/* Assigned Queries */}
+          {/* Client Queries Section */}
           <div className="bg-white/90 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/30 overflow-hidden">
             <div className="p-8 bg-gradient-to-r from-indigo-600 to-purple-600 text-white">
               <h2 className="text-3xl font-bold flex items-center gap-4">
@@ -295,131 +395,169 @@ function AdminDashboard() {
               <p className="mt-2 opacity-90">Manage and respond to compliance requests</p>
             </div>
 
-             <div className="divide-y divide-gray-100">
-               {problems.filter(p => p.status !== "closed").length > 0 ? problems.filter(p => p.status !== "closed").map((p) => (
-                <div key={p.problemId} className="p-8 hover:bg-gray-50/70 transition-all duration-300">
-                  <div className="flex items-start justify-between gap-8">
-                    <div className="flex-1 space-y-5">
-                      <div>
-                        <h3 className="text-2xl font-bold text-gray-900">{p.title}</h3>
-                        <p className="mt-2 text-lg text-gray-600">{p.description}</p>
-                        <div className="mt-3 flex flex-wrap gap-3 text-sm">
-                          <span className="px-4 py-2 bg-indigo-100 text-indigo-700 rounded-xl font-medium">
-                            {p.userName} • {p.userEmail}
-                          </span>
-                          {p.assignedAdmin && (
-                            <span className="px-4 py-2 bg-emerald-100 text-emerald-700 rounded-xl font-medium">
-                              Assigned to {p.assignedAdmin.name}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      {p.attachments?.length > 0 && (
-                         <div className="flex flex-wrap gap-3">
-                           {p.attachments.map((f, fi) => (
-                             <a
-                               key={fi}
-                               href={`https://adl-api-ten.vercel.app${f.url}`}
-                               target="_blank"
-                               rel="noreferrer"
-                               className="inline-flex items-center gap-3 px-5 py-3 bg-blue-100 text-blue-700 rounded-2xl font-semibold hover:bg-blue-200 transition"
-                             >
-                               <Download className="w-5 h-5" /> {f.name}
-                             </a>
-                           ))}
-                         </div>
-                       )}
-
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 pt-4 border-t border-gray-200">
-                        <div>
-                          <label className="text-sm font-medium text-gray-600 flex items-center gap-2">
-                            <MessageSquare className="w-5 h-5" /> Message to Client
-                          </label>
-                          <textarea
-                            rows={3}
-                            className="mt-2 w-full px-5 py-4 border border-gray-300 rounded-2xl focus:ring-4 focus:ring-indigo-200 focus:border-indigo-500 resize-none"
-                            placeholder="Type your response or update..."
-                            value={p.adminMessage || ""}
-                            onChange={(e) => setProblems(prev => prev.map(pr => pr.problemId === p.problemId ? { ...pr, adminMessage: e.target.value } : pr))}
-                          />
-                        </div>
-                        <div className="space-y-4">
+            <div className="divide-y divide-gray-100">
+              {problems.filter((p) => p.status !== "closed").length > 0 ? (
+                problems
+                  .filter((p) => p.status !== "closed")
+                  .map((p) => (
+                    <div key={p.problemId} className="p-8 hover:bg-gray-50/70 transition-all duration-300">
+                      <div className="flex items-start justify-between gap-8">
+                        <div className="flex-1 space-y-5">
                           <div>
-                            <label className="text-sm font-medium text-gray-600 flex items-center gap-2">
-                              <Calendar className="w-5 h-5" /> Schedule Meetup
-                            </label>
-                            <input
-                              type="date"
-                              className="mt-2 w-full px-5 py-4 border border-gray-300 rounded-2xl focus:ring-4 focus:ring-indigo-200 focus:border-indigo-500"
-                              value={p.meetupDate ? new Date(p.meetupDate).toISOString().substring(0,10) : ""}
-                              onChange={(e) => setProblems(prev => prev.map(pr => pr.problemId === p.problemId ? { ...pr, meetupDate: e.target.value } : pr))}
-                            />
+                            <h3 className="text-2xl font-bold text-gray-900">{p.title}</h3>
+                            <p className="mt-2 text-lg text-gray-600">{p.description}</p>
+                            <div className="mt-3 flex flex-wrap gap-3 text-sm">
+                              <span className="px-4 py-2 bg-indigo-100 text-indigo-700 rounded-xl font-medium">
+                                {p.userName} • {p.userEmail}
+                              </span>
+                              {(p.assignTo ? admins.find(a => a._id === p.assignTo)?.name : p.assignedAdmin?.name) && (
+                                <span className="px-4 py-2 bg-emerald-100 text-emerald-700 rounded-xl font-medium">
+                                  Assigned to {p.assignTo ? admins.find(a => a._id === p.assignTo)?.name : p.assignedAdmin?.name}
+                                </span>
+                              )}
+                            </div>
                           </div>
-                          <div className="grid grid-cols-2 gap-4">
-                            <div>
-                              <label className="text-sm font-medium text-gray-600">Status</label>
-                              <select
-                                value={p.status || "pending"}
-                                onChange={(e) => setProblems(prev => prev.map(pr => pr.problemId === p.problemId ? { ...pr, status: e.target.value } : pr))}
-                                className="mt-2 w-full px-5 py-4 border border-gray-300 rounded-2xl focus:ring-4 focus:ring-indigo-200 focus:border-indigo-500 font-medium"
-                              >
-                                <option value="pending">Pending</option>
-                                <option value="in-progress">In Progress</option>
-                                <option value="closed">Closed</option>
-                              </select>
+
+                          {p.attachments?.length > 0 && (
+                            <div className="flex flex-wrap gap-3">
+                              {p.attachments.map((f, fi) => (
+                                <a
+                                  key={fi}
+                                  href={`${API_BASE_URL}${f.url}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="inline-flex items-center gap-3 px-5 py-3 bg-blue-100 text-blue-700 rounded-2xl font-semibold hover:bg-blue-200 transition"
+                                >
+                                  <Download className="w-5 h-5" /> {f.name}
+                                </a>
+                              ))}
                             </div>
+                          )}
+
+                          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 pt-4 border-t border-gray-200">
                             <div>
-                              <label className="text-sm font-medium text-gray-600">Assign To</label>
-                              <select
-                                value={p.assignedAdmin?._id || ""}
-                                onChange={(e) => setProblems(prev => prev.map(pr => pr.problemId === p.problemId ? { ...pr, assignTo: e.target.value || null } : pr))}
-                                className="mt-2 w-full px-5 py-4 border border-gray-300 rounded-2xl focus:ring-4 focus:ring-indigo-200 focus:border-indigo-500 font-medium"
-                              >
-                                <option value="">Unassigned</option>
-                                {admins.map((a) => (
-                                  <option key={a._id} value={a._id}>{a.name}</option>
-                                ))}
-                              </select>
+                              <label className="text-sm font-medium text-gray-600 flex items-center gap-2">
+                                <MessageSquare className="w-5 h-5" /> Message to Client
+                              </label>
+                              <textarea
+                                rows={3}
+                                className="mt-2 w-full px-5 py-4 border border-gray-300 rounded-2xl focus:ring-4 focus:ring-indigo-200 focus:border-indigo-500 resize-none"
+                                placeholder="Type your response or update..."
+                                value={p.adminMessageDraft}
+                                onChange={(e) =>
+                                  setProblems((prev) =>
+                                    prev.map((pr) =>
+                                      pr.problemId === p.problemId ? { ...pr, adminMessageDraft: e.target.value } : pr
+                                    )
+                                  )
+                                }
+                              />
                             </div>
+                            <div className="space-y-4">
+                              <div>
+                                <label className="text-sm font-medium text-gray-600 flex items-center gap-2">
+                                  <Calendar className="w-5 h-5" /> Schedule Meetup
+                                </label>
+                                <input
+                                  type="date"
+                                  className="mt-2 w-full px-5 py-4 border border-gray-300 rounded-2xl focus:ring-4 focus:ring-indigo-200 focus:border-indigo-500"
+                                  value={p.meetupDateDraft}
+                                  onChange={(e) =>
+                                    setProblems((prev) =>
+                                      prev.map((pr) =>
+                                        pr.problemId === p.problemId ? { ...pr, meetupDateDraft: e.target.value } : pr
+                                      )
+                                    )
+                                  }
+                                />
+                              </div>
+                              <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                  <label className="text-sm font-medium text-gray-600">Status</label>
+                                  <select
+                                    value={p.statusDraft}
+                                    onChange={(e) =>
+                                      setProblems((prev) =>
+                                        prev.map((pr) =>
+                                          pr.problemId === p.problemId ? { ...pr, statusDraft: e.target.value } : pr
+                                        )
+                                      )
+                                    }
+                                    className="mt-2 w-full px-5 py-4 border border-gray-300 rounded-2xl focus:ring-4 focus:ring-indigo-200 focus:border-indigo-500 font-medium"
+                                  >
+                                    <option value="pending">Pending</option>
+                                    <option value="in-progress">In Progress</option>
+                                    <option value="closed">Closed</option>
+                                  </select>
+                                </div>
+                                <div>
+                                  <label className="text-sm font-medium text-gray-600">Assign To</label>
+                                  <select
+                                    value={p.assignToDraft}
+                                    onChange={(e) =>
+                                      setProblems((prev) =>
+                                        prev.map((pr) =>
+                                          pr.problemId === p.problemId
+                                            ? { ...pr, assignToDraft: e.target.value }
+                                            : pr
+                                        )
+                                      )
+                                    }
+                                    className="mt-2 w-full px-5 py-4 border border-gray-300 rounded-2xl focus:ring-4 focus:ring-indigo-200 focus:border-indigo-500 font-medium"
+                                  >
+                                    <option value="">Unassigned</option>
+                                    {admins.map((a) => (
+                                      <option key={a._id} value={a._id}>
+                                        {a.name}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex justify-end pt-4">
+                            <button
+                              onClick={() =>
+                                updateProblem(p.problemId, {
+                                  adminMessage: p.adminMessageDraft?.trim(),
+                                  status: p.statusDraft,
+                                  assignTo: p.assignToDraft || null,
+                                  meetupDate: p.meetupDateDraft || null,
+                                })
+                              }
+                              className="flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold rounded-2xl hover:shadow-2xl transform hover:scale-105 transition-all duration-300 shadow-xl"
+                            >
+                              <Save className="w-6 h-6" /> Update Query
+                            </button>
                           </div>
                         </div>
-                      </div>
 
-                      <div className="flex justify-end pt-4">
-                        <button
-                          onClick={() => updateProblem(p.problemId, {
-                            adminMessage: p.adminMessage,
-                            status: p.status,
-                            assignTo: p.assignTo,
-                            meetupDate: p.meetupDate
-                          })}
-                          className="flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold rounded-2xl hover:shadow-2xl transform hover:scale-105 transition-all duration-300 shadow-xl"
+                        <div
+                          className={`px-8 py-4 rounded-full text-lg font-bold shadow-lg ${
+                            p.status === "closed"
+                              ? "bg-emerald-500 text-white"
+                              : p.status === "in-progress"
+                              ? "bg-amber-500 text-white"
+                              : "bg-gray-200 text-gray-700"
+                          }`}
                         >
-                          <Save className="w-6 h-6" /> Update Query
-                        </button>
+                          {p.status?.charAt(0).toUpperCase() + p.status?.slice(1) || "Pending"}
+                        </div>
                       </div>
                     </div>
-
-                    <div className={`px-8 py-4 rounded-full text-lg font-bold shadow-lg ${
-                      p.status === "closed" ? "bg-emerald-500 text-white" :
-                      p.status === "in-progress" ? "bg-amber-500 text-white" :
-                      "bg-gray-200 text-gray-700"
-                    }`}>
-                      {p.status?.charAt(0).toUpperCase() + p.status?.slice(1) || "Pending"}
-                    </div>
-                  </div>
-                </div>
-              )) : (
+                  ))
+              ) : (
                 <div className="text-center py-24">
                   <AlertCircle className="w-28 h-28 text-gray-300 mx-auto mb-6" />
-                  <p className="text-2xl font-medium text-gray-500">No queries assigned yet</p>
+                  <p className="text-2xl font-medium text-gray-500">No active queries at the moment</p>
                 </div>
               )}
             </div>
           </div>
 
-          {/* Add Article */}
+          {/* Publish Article */}
           <div className="bg-white/90 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/30 p-8">
             <h2 className="text-3xl font-bold text-gray-900 mb-8 flex items-center gap-4">
               <BookOpen className="w-10 h-10 text-indigo-600" />
@@ -485,28 +623,40 @@ function AdminDashboard() {
             </div>
           </div>
 
-          {/* Closed Cases & Ratings */}
+          {/* Closed Cases */}
           <div className="bg-white/90 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/30 p-8">
             <h2 className="text-3xl font-bold text-gray-900 mb-8 flex items-center gap-4">
               <CheckCircle className="w-10 h-10 text-emerald-600" />
               Closed Cases & Client Feedback
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {problems.filter(p => p.status === "closed").length > 0 ? (
-                problems.filter(p => p.status === "closed").map((p) => (
-                  <div key={p.problemId} className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-2xl p-6 border border-emerald-100">
-                    <h4 className="font-bold text-gray-900 text-lg">{p.title}</h4>
-                    <p className="text-sm text-gray-600 mt-1">by {p.userName}</p>
-                    <div className="mt-4 flex items-center justify-between">
-                      <span className="text-3xl font-bold text-emerald-600">
-                        {p.rating ? `${p.rating} Stars` : "—"}
-                      </span>
-                      {p.rating ? <Star className="w-10 h-10 text-yellow-500 fill-current" /> : <Star className="w-10 h-10 text-gray-300" />}
+              {problems.filter((p) => p.status === "closed").length > 0 ? (
+                problems
+                  .filter((p) => p.status === "closed")
+                  .map((p) => (
+                    <div key={p.problemId} className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-2xl p-6 border border-emerald-100">
+                      <h4 className="font-bold text-gray-900 text-lg">{p.title}</h4>
+                      <p className="text-sm text-gray-600 mt-1">by {p.userName}</p>
+                      <div className="mt-4 flex items-center justify-between">
+                        <span className="text-3xl font-bold text-emerald-600">
+                          {p.rating ? `${p.rating} Stars` : "No rating"}
+                        </span>
+                        {p.rating ? (
+                          <div className="flex">
+                            {[...Array(5)].map((_, i) => (
+                              <Star key={i} className={`w-8 h-8 ${i < p.rating ? "text-yellow-500 fill-current" : "text-gray-300"}`} />
+                            ))}
+                          </div>
+                        ) : (
+                          <Star className="w-10 h-10 text-gray-300" />
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))
+                  ))
               ) : (
-                <p className="col-span-full text-center text-xl text-gray-500 py-16">No closed cases yet. Keep up the great work!</p>
+                <p className="col-span-full text-center text-xl text-gray-500 py-16">
+                  No closed cases yet. Keep up the great work!
+                </p>
               )}
             </div>
           </div>
